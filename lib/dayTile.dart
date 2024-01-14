@@ -1,26 +1,71 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'main.dart';
 
-import 'dart:convert';
-import 'dart:io';
+import 'main.dart';
+import 'dayLesson.dart';
+
 import 'package:week_of_year/week_of_year.dart';
 
 
 
-ListTile dayTitle(String date) {
-  final norm_date = stringDateToTypeDate(date);
-  final odd = norm_date.weekOfYear % 2 == 0 ? '(чт)' : '(нч)';
+ListTile dayTitle(String date,List<Map<String, String>> lessons, BuildContext context, Map<String, Map<String, List<String>>> calendar) {
+  final normDate = stringDateToTypeDate(date);
+  final odd = normDate.weekOfYear % 2 == 0 ? '(чт)' : '(нч)';
   return ListTile(
+    onTap: () {
+      Navigator.push(
+        context,
+        SizeRoute(
+          page: calendarTest(
+            calendar: calendar,
+            date: date,
+          ),
+        ),
+      );
+    },
+
     title: Container(
-        padding: EdgeInsets.only(top: 5, left: 0, bottom: 5, right: 0),
+        padding: const EdgeInsets.only(top: 2, left: 0, bottom: 2, right: 0),
         decoration: BoxDecoration(
-            color: Colors.deepPurple.shade50,
+            // color: Colors.deepPurple.shade50,
+            color: Theme.of(context).colorScheme.secondaryContainer,
             borderRadius: BorderRadius.circular(15)),
         child: Center(
-          child: Text(
-            '$odd ${wek[norm_date.weekday.toString()]} $date',
-            style: TextStyle(color: Colors.black, fontSize: 25),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                '$odd ${wek[normDate.weekday.toString()]} $date',
+                style: const TextStyle(fontSize: 20),
+              ),
+            ],
+          ),
+        )),
+  );
+}
+
+
+
+
+ListTile dayTitleNoCal(String date,List<Map<String, String>> lessons, BuildContext context) {
+  final normDate = stringDateToTypeDate(date);
+  final odd = normDate.weekOfYear % 2 == 0 ? '(чт)' : '(нч)';
+  return ListTile(
+
+    title: Container(
+        padding: const EdgeInsets.only(top: 2, left: 0, bottom: 2, right: 0),
+        decoration: BoxDecoration(
+          // color: Colors.deepPurple.shade50,
+            color: Theme.of(context).colorScheme.secondaryContainer,
+            borderRadius: BorderRadius.circular(15)),
+        child: Center(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                '$odd ${wek[normDate.weekday.toString()]} $date',
+                style: const TextStyle(fontSize: 20),
+              ),
+            ],
           ),
         )),
   );
