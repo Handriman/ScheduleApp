@@ -1,22 +1,21 @@
 import 'dart:convert';
-import 'dart:ffi';
 import 'dart:io';
 
 import 'dart:math';
 
+import 'package:Raspisanie/getSchedule.dart';
 import 'package:dynamic_color/dynamic_color.dart';
-
-import 'package:flutter/scheduler.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:week_of_year/date_week_extensions.dart';
 import 'package:provider/provider.dart';
+import 'package:http/http.dart' as http;
 
 import 'darkThemeThings.dart';
 import 'dayLesson.dart';
 import 'dayTile.dart';
+// import 'getSchedule.dart';
 
 import 'memorialCard.dart';
-
-
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -27,7 +26,7 @@ void main() async {
   runApp(
     ChangeNotifierProvider(
       create: (_) => ThemeProvider(),
-      child: MyApp(),
+      child: const MyApp(),
     ),
   );
 }
@@ -39,7 +38,7 @@ double textScaleFactor(BuildContext context, {double maxTextScaleFactor = 2}) {
 }
 
 class MyApp extends StatefulWidget {
-  MyApp({super.key});
+  const MyApp({super.key});
 
   static final _defaultLightColorScheme =
       ColorScheme.fromSwatch(primarySwatch: Colors.deepPurple);
@@ -61,7 +60,8 @@ class _MyAppState extends State<MyApp> {
         builder: (context, child) {
           return MediaQuery(
             data: MediaQuery.of(context).copyWith(
-                textScaleFactor: MediaQuery.of(context).textScaleFactor),
+                textScaler:
+                    TextScaler.linear(MediaQuery.of(context).textScaleFactor)),
             child: child!,
           );
         },
@@ -102,17 +102,11 @@ String normalizeDate(String badString) {
 
   return normalString;
 }
-var year = '2023';
-var yearForTranslate = 2023;
+
 DateTime stringDateToTypeDate(String stringDate) {
   final temp = stringDate.split('.');
   int tempYaer = 0;
-  // if (temp[2] == year) {
-  //   tempYaer = yearForTranslate;
-  // } else {
-  //   year = temp[2];
-  //   tempYaer = int.parse(year);
-  // }
+
   tempYaer = int.parse(temp[2]);
   final data =
       DateTime.utc(tempYaer, int.parse(temp[1]), int.parse(temp[0]), 23, 59);
@@ -127,7 +121,7 @@ bool dataCompare(DateTime currentDate, DateTime comparedDate) {
   //   return true;
   // }
 
-  return comparedDate.isBefore(currentDate)? false : true;
+  return comparedDate.isBefore(currentDate) ? false : true;
 }
 
 final wek = {
@@ -148,7 +142,7 @@ class calendarTest extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final main_classes = [
+    final mainClasses = [
       'block holidays',
       'block thisDay',
       'block homiesCal',
@@ -163,7 +157,7 @@ class calendarTest extends StatelessWidget {
     stringDate = '${list[2]}.${list[1]}';
     var text = '';
     List<String> textList = [];
-    for (var clas in main_classes) {
+    for (var clas in mainClasses) {
       if (calendar[stringDate]!.keys.contains(clas)) {
         for (var i = 0; i < calendar[stringDate]![clas]!.length; i++) {
           text = '$text${calendar[stringDate]![clas]![i]}\n';
@@ -192,14 +186,11 @@ class AllSubject extends StatelessWidget {
   ThemeProvider themeProvider;
   Map<String, List<Map<String, String>>> scheduleData;
 
-  AllSubject({
-    super.key,
-    required this.name,
-    required this.scheduleData,
-    required this.themeProvider
-  });
-
-
+  AllSubject(
+      {super.key,
+      required this.name,
+      required this.scheduleData,
+      required this.themeProvider});
 
   @override
   Widget build(BuildContext context) {
@@ -224,7 +215,7 @@ class AllSubject extends StatelessWidget {
                 children: [
                   dayTitleNoCal(date, fItems, context),
                   for (var lesson in fItems) ...[
-                    dayLesson(themeProvider,lesson, scheduleData, context)
+                    dayLesson(themeProvider, lesson, scheduleData, context)
                   ]
                 ],
               );
@@ -243,12 +234,12 @@ String odd(DateTime normDate) {
 }
 
 class ScheduleListView extends StatefulWidget {
-
   ThemeProvider themeProvider;
 
-  ScheduleListView(this.themeProvider,{super.key,});
-
-
+  ScheduleListView(
+    this.themeProvider, {
+    super.key,
+  });
 
   @override
   _ScheduleListViewState createState() => _ScheduleListViewState();
@@ -263,24 +254,69 @@ class _ScheduleListViewState extends State<ScheduleListView> {
   var rightIndex = 0;
   String finder = '';
   Map<String, List<Map<String, String>>> finalSchedule = {};
+  Map<String, List<Map<String, String>>> shortSchedule = {};
+  late Future<bool> isUpdated;
+
+  // НАДО БУДЕТ ОБРАТНО ПОМЕНЯТЬ ДАТУ
+
   final currentDate = DateTime.now();
 
+  // final currentDate = DateTime.parse("2023-01-01 00:00:00.000");
+
   var test_text = "";
+  late Future<Map<String, dynamic>> weather;
 
   @override
   void initState() {
     test_text = "";
     super.initState();
     edited = {};
-
+    isUpdated = upt1();
     finder = '';
-    loadJsonData();
+    readScheduleFile();
+    // loadJsonData();
     loadCalendar();
-
+    // weather = fetchWeather();
     finalSchedule = Map<String, List<Map<String, String>>>.from(scheduleData);
+
+    // shortSchedule = stripSchedule(scheduleData);
   }
 
+  Future<bool> doesFileExist(String filePath) async {
+    return File(filePath).exists();
+  }
 
+  Map<String, List<Map<String, String>>> stripSchedule(
+      Map<String, List<Map<String, String>>> finalSchedule) {
+    Map<String, List<Map<String, String>>> temp = {};
+    var t = DateTime.now();
+
+    for (var el in finalSchedule.keys) {
+      DateTime el_date = stringDateToTypeDate(el);
+      // print(t.difference(el_date).inDays);
+      if ((dataCompare(t, el_date) == true) &&
+          (t.difference(el_date).inDays >= -14)) {
+        temp[el] = List.from(finalSchedule[el]!);
+      }
+    }
+
+    return temp;
+  }
+
+  Future<void> readScheduleFile() async {
+    final directory = await getApplicationDocumentsDirectory();
+    final filePath = '${directory.path}/121111.json';
+    final isExist = await doesFileExist(filePath);
+
+    if (isExist) {
+      loadJsonData();
+    } else {
+      String content = await rootBundle.loadString('assets/121111.json');
+      final file = File(filePath);
+      file.writeAsString(content);
+      loadJsonData();
+    }
+  }
 
   Future<void> loadCalendar() async {
     try {
@@ -311,7 +347,9 @@ class _ScheduleListViewState extends State<ScheduleListView> {
 
   Future<void> loadJsonData() async {
     try {
-      String content = await rootBundle.loadString('assets/121111.json');
+      final directory = await getApplicationDocumentsDirectory();
+      final filePath = '${directory.path}/121111.json';
+      String content = await File(filePath).readAsStringSync();
       Map<String, dynamic> jsonData = jsonDecode(content);
       setState(() {
         scheduleData = jsonData.map((key, value) {
@@ -330,11 +368,36 @@ class _ScheduleListViewState extends State<ScheduleListView> {
     }
   }
 
+
+  Future<http.Response> fetchSchedule() {
+    return http.get(Uri.parse("https://handri.pythonanywhere.com/get_data"));
+  }
+
+  Future<bool> upt1() async {
+    final directory = await getApplicationDocumentsDirectory();
+    final filePath = '${directory.path}/121111.json';
+    final isExist = await doesFileExist(filePath);
+    final response =  await fetchSchedule();
+
+    if (isExist) {
+      final file = File(filePath);
+      // Map<String, dynamic> jsonData = jsonDecode(response.body);
+      file.writeAsString(response.body);
+      readScheduleFile();
+      return true;
+    } else {
+      return false;
+    }
+  }
+
+
   void findMe(bool flag) {
     setState(() {
-      loadJsonData();
-      finalSchedule = scheduleData;
-      Map<String, List<Map<String, String>>> temp = scheduleData;
+      // readScheduleFile();
+      finalSchedule = Map<String, List<Map<String, String>>>.from(scheduleData);
+
+      Map<String, List<Map<String, String>>> temp =
+          Map<String, List<Map<String, String>>>.from(scheduleData);
 
       for (var i = 0; i < scheduleData.length; i++) {
         var items = finalSchedule[scheduleData.keys.elementAt(i)];
@@ -348,9 +411,7 @@ class _ScheduleListViewState extends State<ScheduleListView> {
                   .toLowerCase()
                   .contains(finder.toLowerCase())) ||
               (finalSchedule.keys.elementAt(i).contains(finder)) ||
-              (lesson['type']!
-                  .toLowerCase()
-                  .contains(finder.toLowerCase()))) {
+              (lesson['type']!.toLowerCase().contains(finder.toLowerCase()))) {
             tempList.add(lesson);
           }
         }
@@ -360,6 +421,7 @@ class _ScheduleListViewState extends State<ScheduleListView> {
       if (finder != "") {
         finalSchedule.removeWhere((key, value) => value.isEmpty);
       }
+      // shortSchedule = stripSchedule(scheduleData);
     });
   }
 
@@ -381,61 +443,84 @@ class _ScheduleListViewState extends State<ScheduleListView> {
 
     // ГЛАВНЫЙ ЭКРАН
 
-    return Scaffold(
-      appBar: AppBar(
-        title:
-            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              ThemeSwitcher(),
-              SizedBox(
-                width: 20,
+    return FutureBuilder<bool>(
+        future: isUpdated,
+        builder: (context, snapshot) {
+
+
+
+
+          return Scaffold(
+            appBar: AppBar(
+              title: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const ThemeSwitcher(),
+                  const SizedBox(
+                    width: 20,
+                  ),
+                  Expanded(
+                    child: TextField(
+                      textInputAction: TextInputAction.search,
+                      onChanged: (String value) {
+                        finder = value;
+                        findMe(true);
+                        // setState(() {});
+                      },
+                      decoration: const InputDecoration(
+                        hintText: 'Я помогу в поиске',
+                        border: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        errorBorder: InputBorder.none,
+                      ),
+                    ),
+                  ),
+                  (snapshot.hasData == true && finalSchedule.isEmpty == false)
+                      ? Icon(Icons.check)
+                      : Icon(Icons.update_disabled_rounded),
+                ],
               ),
-              Expanded(
-                  child: TextField(
-                textInputAction: TextInputAction.search,
-                onChanged: (String value) {
-                  finder = value;
-                  if (finder == "") {
-                    findMe(false);
-                  } else {
-                    findMe(true);
-                  }
-                  setState(() {});
-                },
-                decoration: const InputDecoration(
-                  hintText: 'Я помогу в поиске',
-                  border: InputBorder.none,
-                  focusedBorder: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  errorBorder: InputBorder.none,
-                ),
-              ),)
-            ],),
-          ),
-      body: Center(
-        child: (finalSchedule.isEmpty || calendar.isEmpty)
-            ? const CircularProgressIndicator()
-            : Align(
-                alignment: Alignment.topLeft,
-                child: ListView(
-                  children: [
-                    for (var el in finalSchedule.keys) ...[
-                      if (dataCompare(currentDate, stringDateToTypeDate(el)) ==
-                          true)
-                        Column(
-                          children: [
-                            dayTitle(el, finalSchedule[el]!, context, calendar),
-                            for (var i = 0;
-                                i < finalSchedule[el]!.length;
-                                i++) ...[
-                              dayLesson(widget.themeProvider,
-                                  finalSchedule[el]![i], finalSchedule, context)
-                            ],
-                          ],
-                        )
-                    ]
-                  ],
-                )),
-      ),
-    );
+            ),
+            body: Center(
+              child: (finalSchedule.isEmpty)
+                  ? Row(
+                      children: [
+                        // Text("${snapshot.data}"),
+                        const CircularProgressIndicator(),
+                      ],
+                    )
+                  : Align(
+                      alignment: Alignment.topLeft,
+                      child: ListView(
+                        // itemExtent: 700,
+                        children: [
+                          // Text("${snapshot.data}"),
+                          // Text(currentDate.toString()),
+                          for (var el in finalSchedule.keys) ...[
+                            if (dataCompare(
+                                    currentDate, stringDateToTypeDate(el)) ==
+                                true)
+                              Column(
+                                children: [
+                                  dayTitle(el, finalSchedule[el]!, context,
+                                      calendar),
+                                  for (var i = 0;
+                                      i < finalSchedule[el]!.length;
+                                      i++) ...[
+                                    dayLesson(
+                                        widget.themeProvider,
+                                        finalSchedule[el]![i],
+                                        finalSchedule,
+                                        context)
+                                  ],
+                                ],
+                              )
+                          ]
+                        ],
+                      )),
+            ),
+          );
+        });
   }
 }

@@ -172,12 +172,12 @@ class _Add_new_lessonState extends State<Add_new_lesson> {
                 onPressed: () {
                   write(storage, jsonEncode(a));
                 },
-                child: Text("write")),
+                child: const Text("write")),
             ElevatedButton(
                 onPressed: () {
                   Test(storage);
                 },
-                child: Text("read"))
+                child: const Text("read"))
           ],
         ),
         body: (edited.isEmpty)

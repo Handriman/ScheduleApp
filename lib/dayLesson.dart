@@ -1,8 +1,6 @@
 import 'package:Raspisanie/darkThemeThings.dart';
-import 'package:Raspisanie/edit_schedule.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
 
 import 'main.dart';
 
@@ -61,6 +59,8 @@ ListTile dayLesson(ThemeProvider themeProvider, Map<String, String> lesson,
           .harmonizeWith(Theme.of(context).colorScheme.secondary),
       '(КП)': Colors.red.shade100
           .harmonizeWith(Theme.of(context).colorScheme.secondary),
+      '(Практика)': Colors.green.shade50
+          .harmonizeWith(Theme.of(context).colorScheme.secondary),
       '(Экзамен)': Colors.red.shade100
           .harmonizeWith(Theme.of(context).colorScheme.secondary),
       '(КР)': Colors.red.shade100
@@ -82,6 +82,9 @@ ListTile dayLesson(ThemeProvider themeProvider, Map<String, String> lesson,
           .harmonizeWith(Theme.of(context).colorScheme.primary)
           .withAlpha(a),
       '(Практические занятия)': darken(Colors.green.shade50, k)
+          .harmonizeWith(Theme.of(context).colorScheme.primary)
+          .withAlpha(a),
+      '(Практика)':darken(Colors.green.shade50, k)
           .harmonizeWith(Theme.of(context).colorScheme.primary)
           .withAlpha(a),
       '(КП)': darken(Colors.red.shade50, k)

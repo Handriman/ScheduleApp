@@ -1,10 +1,7 @@
 import 'dart:io';
 
 
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
-import 'main.dart';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 
@@ -52,7 +49,7 @@ class CounterStorage{
       return contents.toString();
     } catch (e) {
       // If encountering an error, return 0
-      return "${e.toString()}";
+      return e.toString();
     }
   }
 

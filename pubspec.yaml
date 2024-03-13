@@ -37,6 +37,7 @@ dependencies:
   week_of_year: ^2.2.0
   shared_preferences: ^2.0.9
   provider:
+  http: ^1.2.0
 
 
 dev_dependencies:
