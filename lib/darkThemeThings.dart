@@ -1,3 +1,5 @@
+
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
@@ -19,6 +21,7 @@ class ThemeProvider with ChangeNotifier {
 
   Future<void> _loadTheme() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
+    if(prefs.getString('group') == null){ prefs.setString('group', '121111'); }
     _isDarkMode = prefs.getBool('isDarkMode') ?? false;
     notifyListeners();
   }
