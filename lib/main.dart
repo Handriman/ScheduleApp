@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'dart:math';
 
+import 'package:Raspisanie/file_work.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 
 import 'package:path_provider/path_provider.dart';
@@ -15,6 +16,7 @@ import 'package:http/http.dart' as http;
 import 'darkThemeThings.dart';
 import 'dayLesson.dart';
 import 'dayTile.dart';
+import 'schedule_module.dart';
 
 import 'memorialCard.dart';
 
@@ -23,11 +25,14 @@ import 'package:flutter/services.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
+  SharedPreferences prefs = await SharedPreferences.getInstance();
+  prefs.setString('group', '121111');
   runApp(
     ChangeNotifierProvider(
       create: (_) => ThemeProvider(),
-      child: const MyApp(),
+      child: MyApp(
+        preferences: prefs,
+      ),
     ),
   );
 }
@@ -39,9 +44,9 @@ double textScaleFactor(BuildContext context, {double maxTextScaleFactor = 2}) {
 }
 
 class MyApp extends StatefulWidget {
+  SharedPreferences preferences;
 
-  const MyApp(
-      {super.key});
+  MyApp({super.key, required this.preferences});
 
   static final _defaultLightColorScheme =
       ColorScheme.fromSwatch(primarySwatch: Colors.deepPurple);
@@ -91,7 +96,7 @@ class _MyAppState extends State<MyApp> {
           useMaterial3: true,
         ),
         themeMode: themeProvider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
-        home: ScheduleListView(themeProvider, ),
+        home: ScheduleListView(widget.preferences, themeProvider),
       );
     });
   }
@@ -238,8 +243,10 @@ String odd(DateTime normDate) {
 
 class ScheduleListView extends StatefulWidget {
   ThemeProvider themeProvider;
+  SharedPreferences preferences;
 
   ScheduleListView(
+    this.preferences,
     this.themeProvider, {
     super.key,
   });
@@ -249,7 +256,9 @@ class ScheduleListView extends StatefulWidget {
 }
 
 class _ScheduleListViewState extends State<ScheduleListView> {
-  Map<String, List<Map<String, String>>> scheduleData = {};
+  late Schedule scheduleManager;
+
+  // Map<String, List<Map<String, String>>> scheduleData = {};
 
   Map<String, Map<String, List<String>>> calendar = {};
 
@@ -257,7 +266,7 @@ class _ScheduleListViewState extends State<ScheduleListView> {
   var rightIndex = 0;
   String finder = '';
   Map<String, List<Map<String, String>>> finalSchedule = {};
-  Map<String, List<Map<String, String>>> shortSchedule = {};
+
   late Future<bool> isUpdated;
 
   // НАДО БУДЕТ ОБРАТНО ПОМЕНЯТЬ ДАТУ
@@ -271,32 +280,38 @@ class _ScheduleListViewState extends State<ScheduleListView> {
   late String group;
   late SharedPreferences prefs;
 
-
   Future<void> get_group() async {
     prefs = await SharedPreferences.getInstance();
 
     // if( prefs.getKeys().contains('group') == false) {
     //   prefs.setString('group', '121111');
     // }
-    group =  prefs.getString('group')!;
-
+    group = prefs.getString('group')!;
   }
 
-
   @override
-  void initState()  {
-    test_text = "";
+  void initState() {
     super.initState();
+
+    String? group = widget.preferences.getString('group');
+    if (group == null) {
+      group = '121111';
+      widget.preferences.setString('group', '121111');
+    }
+    scheduleManager = Schedule(group);
+    isUpdated = scheduleManager.updateSchedule();
+
+    test_text = "";
+
     edited = {};
 
-    get_group();
     finder = '';
-    readScheduleFile();
-    // loadJsonData();
-    isUpdated = upt1();
     loadCalendar();
     // weather = fetchWeather();
-    finalSchedule = Map<String, List<Map<String, String>>>.from(scheduleData);
+    scheduleManager.loadSchedule();
+    scheduleManager.mainSchedule;
+    finalSchedule = Map<String, List<Map<String, String>>>.from(
+        scheduleManager.mainSchedule);
 
     // shortSchedule = stripSchedule(scheduleData);
   }
@@ -320,24 +335,6 @@ class _ScheduleListViewState extends State<ScheduleListView> {
     }
 
     return temp;
-  }
-
-  Future<void> readScheduleFile() async {
-    SharedPreferences pref = await SharedPreferences.getInstance();
-    String? file_name = pref.getString('group');
-    // if (file_name == null){ pref.setString('group', '121111'); file_name = '121111'; }
-    final directory = await getApplicationDocumentsDirectory();
-    final filePath = '${directory.path}/$file_name.json';
-    final isExist = await doesFileExist(filePath);
-
-    if (isExist) {
-      loadJsonData();
-    } else {
-      String content = await rootBundle.loadString('assets/121111.json');
-      final file = File(filePath);
-      file.writeAsString(content);
-      loadJsonData();
-    }
   }
 
   Future<void> loadCalendar() async {
@@ -367,66 +364,24 @@ class _ScheduleListViewState extends State<ScheduleListView> {
     }
   }
 
-  Future<void> loadJsonData() async {
-    try {
-      SharedPreferences pref = await SharedPreferences.getInstance();
-      final group = pref.getString('group');
-      final directory = await getApplicationDocumentsDirectory();
-      final filePath = '${directory.path}/$group.json';
-      String content = File(filePath).readAsStringSync();
-      Map<String, dynamic> jsonData = jsonDecode(content);
-      setState(() {
-        scheduleData = jsonData.map((key, value) {
-          if (value is List) {
-            List<Map<String, String>> dataList = (value).map((item) {
-              return Map<String, String>.from(item as Map<String, dynamic>);
-            }).toList();
-            return MapEntry(key, dataList);
-          } else {
-            return MapEntry(key, []);
-          }
-        });
-      });
-    } catch (e) {
-      print('Ошибка чтения файла JSON: $e');
-    }
-  }
-
   Future<http.Response> fetchSchedule(String group) {
-    return http.get(Uri.parse("https://handri.pythonanywhere.com/get_data/$group"));
-  }
-
-  Future<bool> upt1() async {
-    SharedPreferences pref = await SharedPreferences.getInstance();
-    String? file_name = pref.getString('group');
-    // if (file_name == null){ pref.setString('group', '121111'); file_name = '121111'; }
-    final directory = await getApplicationDocumentsDirectory();
-    final filePath = '${directory.path}/$file_name.json';
-    final isExist = await doesFileExist(filePath);
-    final response = await fetchSchedule(file_name!);
-
-    if (isExist) {
-      final file = File(filePath);
-      // Map<String, dynamic> jsonData = jsonDecode(response.body);
-      file.writeAsString(response.body);
-      readScheduleFile();
-      return true;
-    } else {
-      readScheduleFile();
-      return false;
-    }
+    return http
+        .get(Uri.parse("https://handri.pythonanywhere.com/get_data/$group"));
   }
 
   void findMe(bool flag) {
     setState(() {
       // readScheduleFile();
-      finalSchedule = Map<String, List<Map<String, String>>>.from(scheduleData);
+      finalSchedule = Map<String, List<Map<String, String>>>.from(
+          scheduleManager.mainSchedule);
 
       Map<String, List<Map<String, String>>> temp =
-          Map<String, List<Map<String, String>>>.from(scheduleData);
+          Map<String, List<Map<String, String>>>.from(
+              scheduleManager.mainSchedule);
 
-      for (var i = 0; i < scheduleData.length; i++) {
-        var items = finalSchedule[scheduleData.keys.elementAt(i)];
+      for (var i = 0; i < scheduleManager.mainSchedule.length; i++) {
+        var items =
+            finalSchedule[scheduleManager.mainSchedule.keys.elementAt(i)];
         List<Map<String, String>>? tempList = [];
         for (var lesson in items!) {
           if ((lesson['subject']!
@@ -453,52 +408,46 @@ class _ScheduleListViewState extends State<ScheduleListView> {
 
   @override
   Widget build(BuildContext context) {
-    // if (scheduleData.isNotEmpty) {
-    //   Iterable<String> k = scheduleData.keys;
-    //
-    //   for (var i = 0; i < scheduleData.length; i++) {
-    //     String stDate = k.elementAt(i);
-    //     if (dataCompare(currentDate, stringDateToTypeDate(stDate)) == true) {
-    //       rightIndex = i;
-    //     }
-    //   }
-    // }
-
     findMe(false);
     final medText = Theme.of(context);
 
     // ГЛАВНЫЙ ЭКРАН
-
     return FutureBuilder<bool>(
         future: isUpdated,
         builder: (context, snapshot) {
           return Scaffold(
             drawer: Drawer(
-                child: SafeArea(
-                    child: Column(
-              children: [
-                const DrawerHeader(child: Text('Настройки')),
-                const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+              child: SafeArea(
+                child: Column(
                   children: [
-                    ThemeSwitcher(),
-                    Text("Тёмная тема"),
+                    const DrawerHeader(child: Text('Настройки')),
+                    const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        ThemeSwitcher(),
+                        Spacer(),
+                        Text("Тёмная тема"),
+                      ],
+                    ),
+                    TextField(
+                      decoration: InputDecoration(
+                        contentPadding: const EdgeInsets.all(20),
+                        hintText: scheduleManager.group,
+                      ),
+                      onSubmitted: (String value) {
+                        widget.preferences.setString('group', value);
+                        setState(() {
+                          scheduleManager.group = value;
+                          scheduleManager.updateSchedule();
+                          scheduleManager.loadSchedule();
+                          // upt1();
+                        });
+                      },
+                    ),
                   ],
                 ),
-                TextField(
-                  decoration:  InputDecoration(
-                    hintText: group,
-                  ),
-                  onSubmitted: (String value) async {
-                    SharedPreferences prefs = await SharedPreferences.getInstance();
-                    prefs.setString('group', value);
-                    setState(() {
-                      upt1();
-                    });
-                  },
-                ),
-              ],
-            ))),
+              ),
+            ),
             appBar: AppBar(
               title: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -509,7 +458,7 @@ class _ScheduleListViewState extends State<ScheduleListView> {
                   Expanded(
                     child: TextField(
                       textInputAction: TextInputAction.search,
-                      onChanged: (String value) {
+                      onSubmitted: (String value) {
                         finder = value;
                         findMe(true);
                         // setState(() {});
@@ -530,8 +479,22 @@ class _ScheduleListViewState extends State<ScheduleListView> {
               ),
             ),
             body: Center(
-              child: (finalSchedule.isEmpty)
-                  ? const CircularProgressIndicator()
+              child: (scheduleManager.mainSchedule.isEmpty)
+                  // ? const CircularProgressIndicator()
+                  // ? Text(scheduleManager.mainSchedule.toString())
+                  ? RefreshIndicator(
+                      child: ListView(
+                        children: [const CircularProgressIndicator()],
+                      ),
+                      onRefresh: () async {
+                        setState(() {
+                          scheduleManager.loadSchedule();
+                          finalSchedule =
+                              Map<String, List<Map<String, String>>>.from(
+                                  scheduleManager.mainSchedule);
+                        });
+                        return Future.delayed(Duration(seconds: 3));
+                      })
                   : Align(
                       alignment: Alignment.topLeft,
                       child: ListView(
